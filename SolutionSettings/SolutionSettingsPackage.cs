@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.ComponentModel.Design;
 using System.Text;
 using System.Windows.Forms;
+using System.Windows.Forms.VisualStyles;
 using Enexure.SolutionSettings.Settings;
 using EnvDTE;
 using Microsoft.VisualStudio.Settings;
@@ -68,25 +69,37 @@ namespace Enexure.SolutionSettings
             Debug.WriteLine(string.Format(CultureInfo.CurrentCulture, "Entering Initialize() of: {0}", this.ToString()));
             base.Initialize();
 
-            Run();
+            try {
+                Run();
+            } catch (Exception ex) {
+                    
+                throw;
+            }
+            
         }
         #endregion
 
         private void Run()
         {
-            DTE vsEnvironment = (DTE)GetService(typeof(SDTE));
+            DTE environment = (DTE)GetService(typeof(SDTE));
 
+            var masterSettingsPath = Path.Combine(this.UserDataPath, @"text.settings.json");
 
-            Debug.WriteLine(this.UserLocalDataPath);
+            if (File.Exists(masterSettingsPath)) {
+                LoadSettingsFromFile(environment, masterSettingsPath);
+            } else {
+                SaveGlobalSettings(environment, this.ApplicationRegistryRoot, masterSettingsPath); 
+            }
 
-            
-            var propertyPageNames = GetPropertyPages(this.ApplicationRegistryRoot);
-
-
-            var solutionPath = Path.GetDirectoryName(vsEnvironment.Solution.FullName);
+            var solutionPath = Path.GetDirectoryName(environment.Solution.FullName);
             
             var settingsPath = Path.Combine(solutionPath, "text.settings.json");
 
+            LoadSettingsFromFile(environment, settingsPath);
+        }
+
+        private static void LoadSettingsFromFile(DTE environment, string settingsPath)
+        {
             string fileContents = null;
             try {
                 fileContents = File.ReadAllText(settingsPath);
@@ -94,7 +107,27 @@ namespace Enexure.SolutionSettings
                 return;
             }
 
-            var settings = JsonConvert.DeserializeObject(fileContents, typeof(ItemSetting[]));
+            var settings = (IEnumerable<ItemSetting>)JsonConvert.DeserializeObject(fileContents, typeof(ItemSetting[]));
+
+            ApplySettings(environment, settings);
+        }
+
+        private static void SaveGlobalSettings(DTE environment, RegistryKey applicationRegistryRoot, string masterSettingsPath)
+        {
+            var data = JsonConvert.SerializeObject(GenerateGlobalSettings(environment, applicationRegistryRoot));
+
+            File.WriteAllText(masterSettingsPath, data);
+        }
+
+        private static IReadOnlyCollection<ItemSetting> GenerateGlobalSettings(DTE environment, RegistryKey applicationRegistryRoot)
+        {
+            return GetPropertyPages(applicationRegistryRoot)
+                .Select(pageName => new ItemSetting() {
+                    Name = pageName,
+                    Settings = LoadSettings(environment, pageName)
+                })
+                .Where(x => x.Settings != null)
+                .ToList();
         }
 
         private static IEnumerable<string> GetPropertyPages(RegistryKey rootKey)
@@ -119,40 +152,74 @@ namespace Enexure.SolutionSettings
             }
         }
 
-        private void ApplySettings(DTE vsEnvironment, IEnumerable<ItemSetting> settings)
+        private static TabSettings LoadSettings(DTE environment, string languageName)
         {
-            foreach (var setting in settings) {
-                Properties propertiesList = vsEnvironment.get_Properties("TextEditor", setting.Name);
-                if (null == propertiesList) {
-                    // The specified properties collection is not available. 
-                    return;
-                }
+            var properties = environment.Properties["TextEditor", languageName];
 
-                ChangeSettings(propertiesList, setting.Settings);
+            if (!HasProperty(properties, "IndentStyle")) {
+                return null;
+            }
+
+            return new TabSettings() {
+                IndentStyle = GetValue<IndentStyle>(properties.Item("IndentStyle")),
+                TabSize = GetValue<int>(properties.Item("TabSize")),
+                IndentSize = GetValue<int>(properties.Item("IndentSize")),
+                InsertTabs = GetValue<bool>(properties.Item("InsertTabs")),
+            };
+        }
+
+        private static bool HasProperty(Properties properties, string name)
+        {
+            try {
+                properties.Item(name);
+                return true;
+            } catch (Exception) {
+                return false;
+            }
+            
+            /*
+            var len = properties.Count + 1;
+            for (int i = 1; i < len; i++) {
+                if (properties.Item(i).Name == name) {
+                    return true;
+                }
+            }
+            return false;
+            */
+        }
+
+        private static T? GetValue<T>(Property item)
+            where T : struct 
+        {
+            try {
+                return (T)Convert.ChangeType(item.Value, typeof(T));
+            } catch (Exception) {
+                return null;
             }
         }
 
-        private void ChangeSettings(Properties propertiesList, TabSettings settings)
+        private static void SaveSettings(DTE environment, string languageName, TabSettings tabSettings)
         {
-            //_vsIndentStyle.vsIndentStyleDefault
+            var properties = environment.Properties["TextEditor", languageName];
 
-            Property tabSize = propertiesList.Item("TabSize");
-            short oldSize = (short)tabSize.Value;
+            UpdatePropertyItem(properties, "IndentStyle", tabSettings.IndentStyle);
+            UpdatePropertyItem(properties, "TabSize", tabSettings.TabSize);
+            UpdatePropertyItem(properties, "IndentSize", tabSettings.IndentSize);
+            UpdatePropertyItem(properties, "InsertTabs", tabSettings.InsertTabs);
+        }
 
-            string message;
-            if (oldSize != 4) {
-                tabSize.Value = 4;
-                message = string.Format(CultureInfo.CurrentUICulture,
-                    "For Basic, the Text Editor had a tab size of {0}" +
-                    " and now has a tab size of {1}.", oldSize, tabSize.Value);
-            } else {
-                message = string.Format(CultureInfo.CurrentUICulture,
-                    "For Basic, the Text Editor has a tab size of {0}.", tabSize.Value);
+        private static void UpdatePropertyItem(Properties properties, string name, object value)
+        {
+            if (value != null) {
+                properties.Item(name).Value = value;
             }
+        }
 
-            MessageBox.Show(message, "Text Editor, Basic, Tab Size:",
-                MessageBoxButtons.OK, MessageBoxIcon.Information,
-                MessageBoxDefaultButton.Button1, 0);
+        private static void ApplySettings(DTE environment, IEnumerable<ItemSetting> settings)
+        {
+            foreach (var setting in settings) {
+                SaveSettings(environment, setting.Name, setting.Settings);
+            }
         }
 
     }

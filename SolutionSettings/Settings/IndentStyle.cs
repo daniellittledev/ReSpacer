@@ -2,7 +2,7 @@
 
 namespace Enexure.SolutionSettings.Settings
 {
-    public enum IndentStyle
+    public enum IndentStyle : int
     {
         None = 0,
         Default = 1,

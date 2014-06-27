@@ -103,7 +103,7 @@ namespace Enexure.SolutionSettings
             AddUI();
 
             // This might have to be moved, could load before there is a solution.
-            OnSolutionOpened();
+            //OnSolutionOpened();
 
             WireUpEvents();
         }
@@ -141,7 +141,7 @@ namespace Enexure.SolutionSettings
 
         private void ReapplySolutionSettings()
         {
-            OnSolutionOpened();
+            OnSolutionSettingsChanged();
         }
 
         private void OnSolutionOpened()
@@ -153,21 +153,37 @@ namespace Enexure.SolutionSettings
             WatchSolutionFile(GetSolutionSettingsPath(environment.Solution));
         }
 
+        private FileSystemWatcher watcher;
+
         private void WatchSolutionFile(string solutionSettingsPath)
         {
+            Debug.Assert(watcher == null, "watcher == null");
+
             // Create a new FileSystemWatcher and set its properties.
-            var watcher = new FileSystemWatcher {
-                Path = Path.GetDirectoryName(solutionSettingsPath), 
+            watcher = new FileSystemWatcher {
+                Path = Path.GetDirectoryName(solutionSettingsPath),
                 Filter = Path.GetFileName(solutionSettingsPath),
-                NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite, 
+                NotifyFilter = NotifyFilters.LastWrite,
             };
 
-            watcher.Dispose();
+            watcher.Changed += watcher_Changed;
+
+            // Start
+            watcher.EnableRaisingEvents = true;
+        }
+
+        void watcher_Changed(object sender, FileSystemEventArgs e)
+        {
+            ReapplySolutionSettings();
         }
 
         private void OnSolutionClosing()
         {
             // Stop Watching Solution Files
+
+            if (watcher != null) {
+                watcher.Dispose();
+            }
         }
 
         private void OnSolutionSettingsChanged()
@@ -199,10 +215,8 @@ namespace Enexure.SolutionSettings
 
         private void AddSolutionSettingsMenuCommandCallback(object sender, EventArgs e)
         {
-            DTE environment = (DTE)GetService(typeof(SDTE));
-
-            var solutionPath = Path.GetDirectoryName(environment.Solution.FullName);
-            var settingsPath = Path.Combine(solutionPath, "text.settings.json");
+            var environment = GetEnvironment();
+            var settingsPath = GetSolutionSettingsPath(environment.Solution);
 
             SaveGlobalSettingsToFile(environment, this.ApplicationRegistryRoot, settingsPath);
         }

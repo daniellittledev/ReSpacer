@@ -9,6 +9,7 @@ using System.ComponentModel.Design;
 using System.Text;
 using System.Windows.Forms;
 using System.Windows.Forms.VisualStyles;
+using Enexure.SolutionSettings.Commands;
 using Enexure.SolutionSettings.Settings;
 using EnvDTE;
 using Microsoft.VisualStudio.Settings;
@@ -35,13 +36,17 @@ namespace Enexure.SolutionSettings
     // This attribute tells the PkgDef creation utility (CreatePkgDef.exe) that this class is
     // a package.
     [PackageRegistration(UseManagedResourcesOnly = true)]
+    [ProvideAutoLoad(Microsoft.VisualStudio.Shell.Interop.UIContextGuids80.SolutionExists)]
+    // For menus
+    [ProvideMenuResource("Menus.ctmenu", 1)] 
     // This attribute is used to register the information needed to show this package
     // in the Help/About dialog of Visual Studio.
-    [ProvideAutoLoad(Microsoft.VisualStudio.Shell.Interop.UIContextGuids80.SolutionExists)]
     [InstalledProductRegistration("#110", "#112", "1.0", IconResourceID = 400)]
     [Guid(GuidList.guidSolutionSettingsPkgString)]
     public sealed class SolutionSettingsPackage : Package
     {
+        private OleMenuCommand addSolutionSettingsCommand; 
+
         /// <summary>
         /// Default constructor of the package.
         /// Inside this method you can place any initialization code that does not require 
@@ -53,12 +58,6 @@ namespace Enexure.SolutionSettings
         {
             Debug.WriteLine(string.Format(CultureInfo.CurrentCulture, "Entering constructor for: {0}", this.ToString()));
         }
-
-
-
-        /////////////////////////////////////////////////////////////////////////////
-        // Overridden Package Implementation
-        #region Package Members
 
         /// <summary>
         /// Initialization of the package; this method is called right after the package is sited, so this is the place
@@ -72,30 +71,152 @@ namespace Enexure.SolutionSettings
             try {
                 Run();
             } catch (Exception ex) {
-                    
                 throw;
             }
-            
+
         }
-        #endregion
+
+        private readonly string settingsFileName = "text.settings.json";
+
+        private DTE GetEnvironment()
+        {
+            return (DTE)GetService(typeof(SDTE));
+        }
+
+        private string GetMasterSettingsPath()
+        {
+            return Path.Combine(this.UserDataPath, @"text.settings.json");
+        }
+
+        private string GetSolutionSettingsPath(Solution solution)
+        {
+            var solutionPath = Path.GetDirectoryName(solution.FullName);
+
+            Debug.Assert(solutionPath != null, "solutionPath != null");
+            return Path.Combine(solutionPath, "text.settings.json");
+        }
 
         private void Run()
         {
-            DTE environment = (DTE)GetService(typeof(SDTE));
+            OnStartup();
 
-            var masterSettingsPath = Path.Combine(this.UserDataPath, @"text.settings.json");
+            AddUI();
+
+            // This might have to be moved, could load before there is a solution.
+            OnSolutionOpened();
+
+            WireUpEvents();
+        }
+
+        private void WireUpEvents()
+        {
+            var environment = GetEnvironment();
+
+            environment.Events.SolutionEvents.Opened += OnSolutionOpened;
+            environment.Events.SolutionEvents.BeforeClosing += OnSolutionClosing;
+        }
+
+        private void OnStartup()
+        {
+            var environment = GetEnvironment();
+
+            var masterSettingsPath = GetMasterSettingsPath();
 
             if (File.Exists(masterSettingsPath)) {
                 LoadSettingsFromFile(environment, masterSettingsPath);
             } else {
-                SaveGlobalSettings(environment, this.ApplicationRegistryRoot, masterSettingsPath); 
+                SaveGlobalSettingsToFile(environment, this.ApplicationRegistryRoot, masterSettingsPath);
             }
+        }
 
-            var solutionPath = Path.GetDirectoryName(environment.Solution.FullName);
-            
-            var settingsPath = Path.Combine(solutionPath, "text.settings.json");
+        // There is no event for this...
+        private void OnEnvironmentSettingsChanged()
+        {
+            var environment = GetEnvironment();
+
+            SaveGlobalSettingsToFile(environment, this.ApplicationRegistryRoot, GetMasterSettingsPath());
+
+            ReapplySolutionSettings();
+        }
+
+        private void ReapplySolutionSettings()
+        {
+            OnSolutionOpened();
+        }
+
+        private void OnSolutionOpened()
+        {
+            OnSolutionSettingsChanged();
+
+            // Watch Solution Files
+            var environment = GetEnvironment();
+            WatchSolutionFile(GetSolutionSettingsPath(environment.Solution));
+        }
+
+        private void WatchSolutionFile(string solutionSettingsPath)
+        {
+            // Create a new FileSystemWatcher and set its properties.
+            var watcher = new FileSystemWatcher {
+                Path = Path.GetDirectoryName(solutionSettingsPath), 
+                Filter = Path.GetFileName(solutionSettingsPath),
+                NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite, 
+            };
+
+            watcher.Dispose();
+        }
+
+        private void OnSolutionClosing()
+        {
+            // Stop Watching Solution Files
+        }
+
+        private void OnSolutionSettingsChanged()
+        {
+            DTE environment = (DTE)GetService(typeof(SDTE));
+
+            var settingsPath = GetSolutionSettingsPath(environment.Solution);
 
             LoadSettingsFromFile(environment, settingsPath);
+        }
+
+        private void AddUI()
+        {
+            // Now get the OleCommandService object provided by the MPF; this object is the one 
+            // responsible for handling the collection of commands implemented by the package. 
+            var mcs = GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
+            if (null != mcs) {
+
+                // For each command we have to define its id that is a unique Guid/integer pair. 
+                var id = new CommandID(GuidList.guidSolutionSettingsCmdSet, PkgCmdIDList.cmdIdAddSolutionSettings);
+
+                // Now create the OleMenuCommand object for this command.
+                var command = new OleMenuCommand(AddSolutionSettingsMenuCommandCallback, id);
+
+                // Add the command to the command service. 
+                mcs.AddCommand(command);
+            }
+        }
+
+        private void AddSolutionSettingsMenuCommandCallback(object sender, EventArgs e)
+        {
+            DTE environment = (DTE)GetService(typeof(SDTE));
+
+            var solutionPath = Path.GetDirectoryName(environment.Solution.FullName);
+            var settingsPath = Path.Combine(solutionPath, "text.settings.json");
+
+            SaveGlobalSettingsToFile(environment, this.ApplicationRegistryRoot, settingsPath);
+        }
+
+        private void Write(string text)
+        {
+            var windowPane = (IVsOutputWindowPane)GetService(typeof(SVsGeneralOutputWindowPane));
+            if (null == windowPane) {
+                Debug.WriteLine("Failed to get a reference to the Output window General pane");
+                return;
+            }
+            if (Microsoft.VisualStudio.ErrorHandler.Failed(windowPane.OutputString(text))) {
+                Debug.WriteLine("Failed to write on the Output window");
+            } 
         }
 
         private static void LoadSettingsFromFile(DTE environment, string settingsPath)
@@ -112,11 +233,15 @@ namespace Enexure.SolutionSettings
             ApplySettings(environment, settings);
         }
 
-        private static void SaveGlobalSettings(DTE environment, RegistryKey applicationRegistryRoot, string masterSettingsPath)
+        private static void SaveGlobalSettingsToFile(DTE environment, RegistryKey applicationRegistryRoot, string settingsPath)
         {
-            var data = JsonConvert.SerializeObject(GenerateGlobalSettings(environment, applicationRegistryRoot));
+            SaveSettingsToFile(GenerateGlobalSettings(environment, applicationRegistryRoot), settingsPath);
+        }
 
-            File.WriteAllText(masterSettingsPath, data);
+        private static void SaveSettingsToFile(IReadOnlyCollection<ItemSetting> settings, string settingsPath)
+        {
+            var data = JsonConvert.SerializeObject(settings);
+            File.WriteAllText(settingsPath, data);
         }
 
         private static IReadOnlyCollection<ItemSetting> GenerateGlobalSettings(DTE environment, RegistryKey applicationRegistryRoot)

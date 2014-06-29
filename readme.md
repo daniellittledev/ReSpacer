@@ -9,7 +9,7 @@ When the plugin is run for the first time a global settings file will be created
 
 If a solution does not contain a settings file these settings are used.
 
-These defaults can be updated at any time from the UI which will update the file with the currently applied VS settings.
+These defaults can be updated by navigating to `Tools` > `Open Global Text Settings` or by editing the `text.settings.json` file at the Visual Studio `UserDataPath`.
 
 ## Adding settings to a solution
 

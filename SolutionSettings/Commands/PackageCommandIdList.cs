@@ -15,5 +15,6 @@ namespace Enexure.SolutionSettings.Commands
     {
         // Now define the list a set of public static members. 
         public const int cmdIdAddSolutionSettings = 0x1001;
+        public const int cmdIdOpenGlobalSolutionSettings = 0x1002;
     } 
 }

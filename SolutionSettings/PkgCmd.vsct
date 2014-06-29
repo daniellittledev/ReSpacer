@@ -10,15 +10,28 @@
     <Commands package="guidSolutionSettingsPkgString">
         
         <Groups>
-            <Group guid="guidSolutionSettingsCmdSet" id="MenuGroup" priority="0x600">
+            <Group guid="guidSolutionSettingsCmdSet" id="ProjectMenuGroup" priority="0x600">
                 <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_PROJECT"/>
+            </Group>
+
+            <Group guid="guidSolutionSettingsCmdSet" id="ToolsMenuGroup" priority="0x600">
+                <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
             </Group>
         </Groups>
         
         <Buttons>
-            <Button guid="guidSolutionSettingsCmdSet" id="cmdIdAddSolutionSettings" priority="0x100" type="Button">
-                <Parent guid="guidSolutionSettingsCmdSet" id="MenuGroup"/>
-                <Icon guid="guidImages" id="bmpPicArrow"/>
+            <Button guid="guidSolutionSettingsCmdSet" id="cmdIdOpenGlobalSolutionSettings" priority="0x500" type="Button">
+                <Parent guid="guidSolutionSettingsCmdSet" id="ToolsMenuGroup"/>
+                <!--<Icon guid="guidImages" id="bmpPicArrow"/>-->
+                <Strings>
+                    <ButtonText>Open Global Text Settings</ButtonText>
+                </Strings>
+            </Button>
+
+            <Button guid="guidSolutionSettingsCmdSet" id="cmdIdAddSolutionSettings" priority="0x500" type="Button">
+                <Parent guid="guidSolutionSettingsCmdSet" id="ProjectMenuGroup"/>
+                <!--<Icon guid="guidImages" id="bmpPicArrow"/>-->
+                <CommandFlag>DynamicVisibility</CommandFlag>
                 <Strings>
                     <ButtonText>Update Solution Text Settings</ButtonText>
                 </Strings>
@@ -31,14 +44,20 @@
 
     </Commands>
 
+    <VisibilityConstraints>
+        <VisibilityItem guid="guidSolutionSettingsCmdSet" id="cmdIdAddSolutionSettings" context="UICONTEXT_SolutionExists" />
+    </VisibilityConstraints>
+
     <Symbols>
         <!--The first GUID defined here is the one for the package. It does not contains numeric IDs.-->
         <GuidSymbol name="guidSolutionSettingsPkgString" value="{857D56EC-07D2-4565-9A2B-AFDBFA25D2FA}" />
 
         <!--The GUID for the command set is the one that contains the numeric IDs used in this sample with the only exception of the one used for the bitmap.-->
         <GuidSymbol name="guidSolutionSettingsCmdSet" value="{FB6AAA41-0571-4BFD-88F1-6782DC2E1C10}">
-            <IDSymbol name="MenuGroup" value="0x1010" />
+            <IDSymbol name="ProjectMenuGroup" value="0x1020" />
+            <IDSymbol name="ToolsMenuGroup" value="0x1010" />
             <IDSymbol name="cmdIdAddSolutionSettings" value="0x1001" />
+            <IDSymbol name="cmdIdOpenGlobalSolutionSettings" value="0x1002" />
         </GuidSymbol>
 
         <!--Last is the definition of the GUID used for the Bitmap and the ID of its slots -->

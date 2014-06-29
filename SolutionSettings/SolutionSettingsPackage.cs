@@ -6,18 +6,11 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.ComponentModel.Design;
-using System.Text;
-using System.Windows.Forms;
-using System.Windows.Forms.VisualStyles;
 using Enexure.SolutionSettings.Commands;
 using Enexure.SolutionSettings.Settings;
 using EnvDTE;
-using Microsoft.VisualStudio.Settings;
-using Microsoft.VisualStudio.Shell.Settings;
 using Microsoft.Win32;
-using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell.Interop;
-using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.Shell;
 using Newtonsoft.Json;
 
@@ -100,10 +93,7 @@ namespace Enexure.SolutionSettings
         {
             OnStartup();
 
-            AddUI();
-
-            // This might have to be moved, could load before there is a solution.
-            //OnSolutionOpened();
+            SetupUserInterface();
 
             WireUpEvents();
         }
@@ -148,6 +138,8 @@ namespace Enexure.SolutionSettings
         {
             OnSolutionSettingsChanged();
 
+            addSolutionSettingsCommand.Visible = true;
+
             // Watch Solution Files
             var environment = GetEnvironment();
             WatchSolutionFile(GetSolutionSettingsPath(environment.Solution));
@@ -181,6 +173,8 @@ namespace Enexure.SolutionSettings
         {
             // Stop Watching Solution Files
 
+            addSolutionSettingsCommand.Visible = false;
+
             if (watcher != null) {
                 watcher.Dispose();
             }
@@ -195,22 +189,52 @@ namespace Enexure.SolutionSettings
             LoadSettingsFromFile(environment, settingsPath);
         }
 
-        private void AddUI()
+        private void SetupUserInterface()
         {
             // Now get the OleCommandService object provided by the MPF; this object is the one 
             // responsible for handling the collection of commands implemented by the package. 
             var mcs = GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
             if (null != mcs) {
 
-                // For each command we have to define its id that is a unique Guid/integer pair. 
-                var id = new CommandID(GuidList.guidSolutionSettingsCmdSet, PkgCmdIDList.cmdIdAddSolutionSettings);
-
-                // Now create the OleMenuCommand object for this command.
-                var command = new OleMenuCommand(AddSolutionSettingsMenuCommandCallback, id);
-
-                // Add the command to the command service. 
-                mcs.AddCommand(command);
+                ConfigureAddSolutionSettingsCommand(mcs);
+                ConfigureOpenGlobalSettingsCommand(mcs);
             }
+        }
+
+        private void ConfigureOpenGlobalSettingsCommand(OleMenuCommandService mcs)
+        {
+            // For each command we have to define its id that is a unique Guid/integer pair. 
+            var id = new CommandID(GuidList.guidSolutionSettingsCmdSet, PkgCmdIDList.cmdIdOpenGlobalSolutionSettings);
+
+            // Now create the OleMenuCommand object for this command.
+            var command = new OleMenuCommand(OpenGlobalSettingsMenuCommandCallback, id);
+
+            // Add the command to the command service. 
+            mcs.AddCommand(command);
+        }
+
+        private void OpenGlobalSettingsMenuCommandCallback(object sender, EventArgs e)
+        {
+            var environment = GetEnvironment();
+            var settingsPath = GetMasterSettingsPath();
+
+            OpenFile(environment, settingsPath);
+        }
+
+        private void ConfigureAddSolutionSettingsCommand(OleMenuCommandService mcs)
+        {
+            // For each command we have to define its id that is a unique Guid/integer pair. 
+            var id = new CommandID(GuidList.guidSolutionSettingsCmdSet, PkgCmdIDList.cmdIdAddSolutionSettings);
+
+            // Now create the OleMenuCommand object for this command.
+            var command = new OleMenuCommand(AddSolutionSettingsMenuCommandCallback, id);
+
+            // Add the command to the command service. 
+            mcs.AddCommand(command);
+
+            command.Visible = false;
+
+            addSolutionSettingsCommand = command;
         }
 
         private void AddSolutionSettingsMenuCommandCallback(object sender, EventArgs e)
@@ -218,7 +242,31 @@ namespace Enexure.SolutionSettings
             var environment = GetEnvironment();
             var settingsPath = GetSolutionSettingsPath(environment.Solution);
 
+            var alreadyExists = File.Exists(settingsPath);
+
             SaveGlobalSettingsToFile(environment, this.ApplicationRegistryRoot, settingsPath);
+
+            if (!alreadyExists) {
+                AddFileToSolution(environment, settingsPath);
+                OpenFile(environment, settingsPath);
+            }
+        }
+
+        private static void AddFileToSolution(DTE environment, string filePath)
+        {
+            // Select the solution
+            var window = environment.Windows.Item(EnvDTE.Constants.vsWindowKindSolutionExplorer);
+            var hierarchy = window.Object as UIHierarchy;
+            var rootItem = hierarchy.UIHierarchyItems.Item(1);
+            rootItem.Select(vsUISelectionType.vsUISelectionTypeSelect);
+
+            environment.ItemOperations.AddExistingItem(filePath);
+            //environment.Solution.AddFromFile(filePath);
+        }
+
+        private static void OpenFile(DTE environment, string filePath)
+        {
+            environment.ItemOperations.OpenFile(filePath);
         }
 
         private void Write(string text)
@@ -254,7 +302,7 @@ namespace Enexure.SolutionSettings
 
         private static void SaveSettingsToFile(IReadOnlyCollection<ItemSetting> settings, string settingsPath)
         {
-            var data = JsonConvert.SerializeObject(settings);
+            var data = JsonConvert.SerializeObject(settings, Formatting.Indented);
             File.WriteAllText(settingsPath, data);
         }
 

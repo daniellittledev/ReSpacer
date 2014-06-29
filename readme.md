@@ -34,4 +34,4 @@ For each Editor option you select you can then override.
 
 ## Get it now
 
-Download link comming soon
+[Download it now from the visual studio gallary](http://visualstudiogallery.msdn.microsoft.com/7a3c6a75-03e7-4a4d-9edf-ce6fd177ee40)

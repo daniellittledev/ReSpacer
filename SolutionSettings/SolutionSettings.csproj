@@ -160,11 +160,18 @@
     <None Include="Key.snk" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Resources\Screen.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <VSCTCompile Include="PkgCmd.vsct">
-        <ResourceName>Menus.ctmenu</ResourceName>
+      <ResourceName>Menus.ctmenu</ResourceName>
     </VSCTCompile>
     <Resource Include="Resources\Images.png" />
-    <Content Include="Resources\Package.ico" />
+    <Content Include="Resources\Package.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
   </ItemGroup>
   <PropertyGroup>
     <UseCodebase>true</UseCodebase>

@@ -1,0 +1,155 @@
+[
+  {
+    "Name": "AllLanguages",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": null,
+      "IndentSize": null,
+      "InsertTabs": null
+    }
+  },
+  {
+    "Name": "Basic",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 4,
+      "IndentSize": 4,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "C/C++",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 4,
+      "IndentSize": 4,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "CoffeeScript",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 4,
+      "IndentSize": 4,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "CSharp",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 4,
+      "IndentSize": 4,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "CSS",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 2,
+      "IndentSize": 2,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "FSharp",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 4,
+      "IndentSize": 4,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "HTML",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 2,
+      "IndentSize": 2,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "HTMLX",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 2,
+      "IndentSize": 2,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "JavaScript",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 2,
+      "IndentSize": 2,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "LESS",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 2,
+      "IndentSize": 2,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "PlainText",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 4,
+      "IndentSize": 4,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "ResJSON Resource",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 2,
+      "IndentSize": 2,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "SQL Server Tools",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 4,
+      "IndentSize": 4,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "T-SQL90",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 4,
+      "IndentSize": 4,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "XAML",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 2,
+      "IndentSize": 2,
+      "InsertTabs": true
+    }
+  },
+  {
+    "Name": "XML",
+    "Settings": {
+      "IndentStyle": null,
+      "TabSize": 2,
+      "IndentSize": 2,
+      "InsertTabs": true
+    }
+  }
+]

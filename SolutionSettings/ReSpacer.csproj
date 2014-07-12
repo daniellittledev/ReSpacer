@@ -133,9 +133,17 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="Services\Main.cs" />
+    <Compile Include="Services\SettingApplier.cs" />
+    <Compile Include="Services\SettingsModel.cs" />
+    <Compile Include="Services\SettingsPersister.cs" />
     <Compile Include="Settings\IndentStyle.cs" />
-    <Compile Include="Settings\ItemSetting.cs" />
-    <Compile Include="Settings\TabSettings.cs" />
+    <Compile Include="Settings\Version1\ItemSetting.cs" />
+    <Compile Include="Settings\Version1\TabSettings.cs" />
+    <Compile Include="Settings\Version2\SettingsPropertyCollection.cs" />
+    <Compile Include="Settings\Version2\VisualStudioSettings.cs" />
+    <Compile Include="Settings\Version2\TabSettings.cs" />
+    <Compile Include="Settings\Version2\TextEditorSettings.cs" />
     <Compile Include="SolutionSettingsPackage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -166,6 +174,7 @@
     </Content>
     <VSCTCompile Include="PkgCmd.vsct">
       <ResourceName>Menus.ctmenu</ResourceName>
+      <SubType>Designer</SubType>
     </VSCTCompile>
     <Resource Include="Resources\Images.png" />
     <Content Include="Resources\Package.ico">

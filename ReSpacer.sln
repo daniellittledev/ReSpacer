@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.30110.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolutionSettings", "SolutionSettings\SolutionSettings.csproj", "{4AEA4A27-7916-4074-9E02-A5096F7EF0D8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReSpacer", "SolutionSettings\ReSpacer.csproj", "{4AEA4A27-7916-4074-9E02-A5096F7EF0D8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolutionSettings_IntegrationTests", "SolutionSettings\SolutionSettings_IntegrationTests\SolutionSettings_IntegrationTests.csproj", "{F87B371F-45D2-4909-910A-4D08C1C085F2}"
 EndProject
@@ -11,6 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		IntegrationTests.testsettings = IntegrationTests.testsettings
 		readme.md = readme.md
+		text.settings.json = text.settings.json
 		UnitTests.testsettings = UnitTests.testsettings
 	EndProjectSection
 EndProject

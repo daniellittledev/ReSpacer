@@ -13,26 +13,25 @@
 			<Group guid="guidSolutionSettingsCmdSet" id="SettingsGroup" priority="0x0600">
 				<Parent guid="guidSHLMainMenu" id="IDM_VS_CSCD_SOLUTION_ADD"/>
 			</Group>
-			<Group guid="guidSolutionSettingsCmdSet" id="ToolsMenuGroup" priority="0x600">
+            <!--<Group guid="guidSolutionSettingsCmdSet" id="ToolsMenuGroup" priority="0x600">
 				<Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
-			</Group>
+			</Group>-->
 		</Groups>
 
 		<Buttons>
 			<Button guid="guidSolutionSettingsCmdSet" id="cmdIdAddSolutionSettings" priority="0x0100" type="Button">
 				<Parent guid="guidSolutionSettingsCmdSet" id="SettingsGroup" />
-				<!--<CommandFlag>DynamicVisibility</CommandFlag>-->
 				<Strings>
-					<ButtonText>New &amp;Editor Settings File</ButtonText>
+					<ButtonText>New &amp;ReSpacer Settings File</ButtonText>
 					<ToolTipText>Creates a settings file for this solution, initialized from your current Visual Studio text editor options.</ToolTipText>
 				</Strings>
 			</Button>
-			<Button guid="guidSolutionSettingsCmdSet" id="cmdIdOpenGlobalSolutionSettings" priority="0x500" type="Button">
+			<!--<Button guid="guidSolutionSettingsCmdSet" id="cmdIdOpenGlobalSolutionSettings" priority="0x500" type="Button">
 				<Parent guid="guidSolutionSettingsCmdSet" id="ToolsMenuGroup"/>
 				<Strings>
 					<ButtonText>Open Global Editor Settings</ButtonText>
 				</Strings>
-			</Button>
+			</Button>-->
 		</Buttons>
 
 	</Commands>
@@ -50,9 +49,9 @@
 		<!--The GUID for the command set is the one that contains the numeric IDs used in this sample with the only exception of the one used for the bitmap.-->
 		<GuidSymbol name="guidSolutionSettingsCmdSet" value="{FB6AAA41-0571-4BFD-88F1-6782DC2E1C10}">
 			<IDSymbol name="SettingsGroup" value="0x1020" />
-			<IDSymbol name="ToolsMenuGroup" value="0x1010" />
+			<!--<IDSymbol name="ToolsMenuGroup" value="0x1010" />-->
 			<IDSymbol name="cmdIdAddSolutionSettings" value="0x1001" />
-			<IDSymbol name="cmdIdOpenGlobalSolutionSettings" value="0x1002" />
+			<!--<IDSymbol name="cmdIdOpenGlobalSolutionSettings" value="0x1002" />-->
 		</GuidSymbol>
 
 	</Symbols>

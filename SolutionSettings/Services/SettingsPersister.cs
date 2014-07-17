@@ -17,11 +17,11 @@ namespace Enexure.SolutionSettings.Services
 		static SettingsPersister()
 		{
 			versionReader = new Dictionary<int, Func<StreamReader, Task<VisualStudioSettings>>>() {
-				{ 2, LoadVersion2 }
+				{ 2, LoadVersion2Async }
 			};
 		}
 
-		public static async Task Save(string path, VisualStudioSettings settings)
+		public static async Task SaveAsync(string path, VisualStudioSettings settings)
 		{
 			var data = JsonConvert.SerializeObject(settings, Formatting.Indented);
 
@@ -32,13 +32,13 @@ namespace Enexure.SolutionSettings.Services
 			}
 		}
 
-		public static async Task<VisualStudioSettings> Load(string path)
+		public static async Task<VisualStudioSettings> LoadAsync(string path)
 		{
 			try {
 				using (var file = new FileStream(path, FileMode.Open, FileAccess.Read))
 				using (var reader = new StreamReader(file)) {
 
-					var versionNumber = await GetValue(reader);
+					var versionNumber = await GetValueAsync(reader);
 					if (versionNumber > 1) {
 
 						return await versionReader[versionNumber](reader);
@@ -46,14 +46,14 @@ namespace Enexure.SolutionSettings.Services
 
 					file.Seek(0, SeekOrigin.Begin);
 					reader.DiscardBufferedData();
-					return await LoadVersion1(reader);
+					return await LoadVersion1Async(reader);
 				}
 			} catch (FileNotFoundException ex) {
 				return null;
 			}
 		}
 
-		private static async Task<int> GetValue(StreamReader reader)
+		private static async Task<int> GetValueAsync(StreamReader reader)
 		{
 			const int bufferSize = 4;
 			var buffer = new char[bufferSize];
@@ -70,7 +70,7 @@ namespace Enexure.SolutionSettings.Services
 			return versionNumber;
 		}
 
-		public static async Task<VisualStudioSettings> LoadVersion1(StreamReader reader)
+		private static async Task<VisualStudioSettings> LoadVersion1Async(StreamReader reader)
 		{
 			//var text = await reader.ReadToEndAsync();
 
@@ -98,7 +98,7 @@ namespace Enexure.SolutionSettings.Services
 			});
 		}
 
-		public static async Task<VisualStudioSettings> LoadVersion2(StreamReader reader)
+		private static async Task<VisualStudioSettings> LoadVersion2Async(StreamReader reader)
 		{
 			var serializer = new JsonSerializer();
 			return await Task.Factory.StartNew(() => {

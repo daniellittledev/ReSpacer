@@ -1,51 +1,20 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.Design;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Net.Configuration;
-using System.Runtime.Remoting.Proxies;
-using System.Text;
-using System.Threading.Tasks;
-using Enexure.SolutionSettings.Commands;
+using System.Reactive;
+using System.Reactive.Linq;
+using Enexure.SolutionSettings.ReactiveExtensions;
 using EnvDTE;
-using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
-using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.Win32;
+using Task = System.Threading.Tasks.Task;
 
 namespace Enexure.SolutionSettings.Services
 {
 	class Main
 	{
-		private OleMenuCommand addSolutionSettingsCommand; 
 
-		private readonly string settingsFileName = "text.settings.json";
-
-		private readonly DTE environment;
-		private readonly RegistryKey applicationRegistryRoot;
-		private readonly string userDataPath;
-		private readonly OleMenuCommandService menuCommandService;
-
-		private SettingsModel settings;
-
-		public Main(DTE environment, RegistryKey applicationRegistryRoot, string userDataPath, OleMenuCommandService menuCommandService)
-		{
-			this.environment = environment;
-			this.applicationRegistryRoot = applicationRegistryRoot;
-			this.userDataPath = userDataPath;
-			this.menuCommandService = menuCommandService;
-		}
-
-		public void Run()
-		{
-			OnStartup();
-
-			SetupUserInterface();
-
-			WireUpEvents();
-		}
+		#region Settings Paths
 		
 		private string GetGlobalSettingsPath()
 		{
@@ -61,140 +30,115 @@ namespace Enexure.SolutionSettings.Services
 			return Path.Combine(solutionPath, settingsFileName);
 		}
 
-		static readonly VSConstants.VSStd97CmdID[] optionsCommands =
+		#endregion
+
+		private readonly string settingsFileName = "text.settings.json";
+
+		private readonly DTE environment;
+		private readonly RegistryKey applicationRegistryRoot;
+		private readonly string userDataPath; 
+
+		private readonly VisualStudioMenuManager visualStudioMenuManager;
+		private readonly VisualStudioSettingsManager visualStudioSettingsManager;
+
+		//private SettingsFileWatcher settings;
+
+		public Main(DTE environment, RegistryKey applicationRegistryRoot, string userDataPath, OleMenuCommandService menuCommandService)
 		{
-			VSConstants.VSStd97CmdID.ToolsOptions,
-			VSConstants.VSStd97CmdID.DebugOptions,
-			VSConstants.VSStd97CmdID.CustomizeKeyboard
-		};
+			this.environment = environment;
+			this.applicationRegistryRoot = applicationRegistryRoot;
+			this.userDataPath = userDataPath;
+
+			this.visualStudioMenuManager = new VisualStudioMenuManager(menuCommandService);
+			this.visualStudioSettingsManager = new VisualStudioSettingsManager(environment);
+		}
+
+		public async void Run()
+		{
+			WireUpEvents();
+		}
+
+		private async Task EnsureGlobalSettingsFile()
+		{
+			/* ensure global settings */
+			var settingsPath = GetGlobalSettingsPath();
+			if (!File.Exists(settingsPath)) {
+				var settings = SettingApplier.Extract(environment, applicationRegistryRoot);
+				await SettingsPersister.SaveAsync(settingsPath, settings);
+			}
+		}
 
 		private void WireUpEvents()
 		{
-			environment.Events.SolutionEvents.Opened += OnSolutionOpened;
-			environment.Events.SolutionEvents.BeforeClosing += OnSolutionClosing;
+			var vsReady = VisualStudioReady();
 
-			foreach (var optionCmdId in optionsCommands) {
-				AddCommandEventHandler(VSConstants.GUID_VSStandardCommandSet97, optionCmdId, ToolsOptionsCommand_AfterExecute);
-			}
+			vsReady
+				.Subscribe(_ => EnsureGlobalSettingsFile().Wait());
+
+			var solutionSettingsAdding = SolutionSettingsAdding();
+
+			solutionSettingsAdding
+				.Subscribe(_ => {
+					/* add the file */
+				});
+
+			var solutionOpened = SolutionOpened();
+			var solutionClosed = SolutionClosed();
+			var settingsNeedsReload = Observable.Merge(solutionOpened, solutionClosed);
+
+			settingsNeedsReload
+				.ContinueAfter(() => vsReady)
+				.Throttle(TimeSpan.FromSeconds(0.5))
+				.Subscribe(_ => {
+					/* reload settings */
+				});
+
 		}
 
-		// Necessary to prevent event objects from being GC'd.
-		// See http://stackoverflow.com/a/13581371/34397
-		private readonly List<CommandEvents> commandEventHandlers = new List<CommandEvents>();
-
-		private void AddCommandEventHandler(Guid group, VSConstants.VSStd97CmdID cmdId, _dispCommandEvents_AfterExecuteEventHandler handler)
+		private IObservable<Unit> SolutionSettingsAdding()
 		{
-			var commandEvents = environment.Events.CommandEvents[group.ToString("B"), (int)cmdId];
-			commandEvents.AfterExecute += handler;
-
-			commandEventHandlers.Add(commandEvents);
+			return Observable.FromEventPattern(
+				ev => visualStudioMenuManager.OnAddSolutionSettings += ev,
+				ev => visualStudioMenuManager.OnAddSolutionSettings -= ev)
+				.Select(x => Unit.Default);
 		}
 
-		private void ToolsOptionsCommand_AfterExecute(string Guid, int ID, object CustomIn, object CustomOut)
+		private IObservable<Unit> EnvironmentSettingsChanged()
 		{
-			// After the user changes any options, save them.
-			settings.Save();
+			return Observable.FromEventPattern(
+				ev => visualStudioSettingsManager.OnSettingsUpdated += ev,
+				ev => visualStudioSettingsManager.OnSettingsUpdated -= ev)
+				.Select(x => Unit.Default);
 		}
 
-		private void OnStartup()
+		private IObservable<Unit> VisualStudioReady()
 		{
-			EnsureGlobalSettingsAreSaved();
-
-			// wait to open in case we're just about to open a new solution.
+			//var vs = environment.Events.DTEEvents;
+			//return Observable.FromEvent<_dispDTEEvents_OnStartupCompleteEventHandler, Unit>(
+			//	ev => vs.OnStartupComplete += ev,
+			//	ev => vs.OnStartupComplete -= ev);
+		
+			return Observable.Defer(() => Observable.Return(Unit.Default));
 		}
 
-		private void EnsureGlobalSettingsAreSaved()
+		private IObservable<Unit> SolutionOpened()
 		{
-			var masterSettingsPath = GetMasterSettingsPath();
-			throw new NotImplementedException();
+			var solution = environment.Events.SolutionEvents;
+
+			return Observable.FromEvent<_dispSolutionEvents_OpenedEventHandler, Unit>(
+				ev => solution.Opened += ev,
+				ev => solution.Opened -= ev);
 		}
 
-		private void OnSolutionOpened()
+		private IObservable<Unit> SolutionClosed()
 		{
-			addSolutionSettingsCommand.Visible = true;
+			var solution = environment.Events.SolutionEvents;
 
-			var settingsPath = GetSolutionSettingsPath(environment.Solution);
-
-			// wait to open in case we're just about to close the solution.
-			settings = new SettingsModel(environment, settingsPath);
+			return Observable.FromEvent<_dispSolutionEvents_AfterClosingEventHandler, Unit>(
+				ev => solution.AfterClosing += ev,
+				ev => solution.AfterClosing -= ev);
 		}
 
-		private void OnSolutionClosing()
-		{
-			// wait to open in case we're just about to open a new solution.
-			addSolutionSettingsCommand.Visible = false;
-		}
-
-		private void SetupUserInterface()
-		{
-			if (null != menuCommandService) {
-
-				ConfigureAddSolutionSettingsCommand(menuCommandService);
-				ConfigureOpenGlobalSettingsCommand(menuCommandService);
-			}
-		}
-
-		private void ConfigureOpenGlobalSettingsCommand(OleMenuCommandService mcs)
-		{
-			// For each command we have to define its id that is a unique Guid/integer pair. 
-			var id = new CommandID(GuidList.guidSolutionSettingsCmdSet, PkgCmdIDList.cmdIdOpenGlobalSolutionSettings);
-
-			// Now create the OleMenuCommand object for this command.
-			var command = new OleMenuCommand(OpenGlobalSettingsMenuCommandCallback, id);
-
-			// Add the command to the command service. 
-			mcs.AddCommand(command);
-		}
-
-		private void OpenGlobalSettingsMenuCommandCallback(object sender, EventArgs e)
-		{
-			var settingsPath = GetGlobalSettingsPath();
-			OpenFile(environment, settingsPath);
-		}
-
-		private void ConfigureAddSolutionSettingsCommand(OleMenuCommandService mcs)
-		{
-			// For each command we have to define its id that is a unique Guid/integer pair. 
-			var id = new CommandID(GuidList.guidSolutionSettingsCmdSet, PkgCmdIDList.cmdIdAddSolutionSettings);
-
-			// Now create the OleMenuCommand object for this command.
-			var command = new OleMenuCommand(AddSolutionSettingsMenuCommandCallback, id);
-
-			// Add the command to the command service. 
-			mcs.AddCommand(command);
-
-			command.Visible = false;
-
-			addSolutionSettingsCommand = command;
-		}
-
-		private void AddSolutionSettingsMenuCommandCallback(object sender, EventArgs e)
-		{
-			var settingsPath = GetSolutionSettingsPath(environment.Solution);
-
-			settings.Move(settingsPath);
-
-			if (!alreadyExists) {
-				AddFileToSolution(environment, settingsPath);
-				OpenFile(environment, settingsPath);
-			}
-		}
-
-		private static void AddFileToSolution(DTE environment, string filePath)
-		{
-			// Select the solution
-			var window = environment.Windows.Item(EnvDTE.Constants.vsWindowKindSolutionExplorer);
-			var hierarchy = window.Object as UIHierarchy;
-			Debug.Assert(hierarchy != null, "hierarchy != null");
-			var rootItem = hierarchy.UIHierarchyItems.Item(1);
-			rootItem.Select(vsUISelectionType.vsUISelectionTypeSelect);
-
-			environment.ItemOperations.AddExistingItem(filePath);
-		}
-
-		private static void OpenFile(DTE environment, string filePath)
-		{
-			environment.ItemOperations.OpenFile(filePath);
-		}
+		
 	}
 }

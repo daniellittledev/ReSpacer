@@ -27,8 +27,27 @@ namespace Enexure.SolutionSettings.Services
 			if (solution == null) throw new ArgumentNullException("solution");
 
 			var solutionPath = Path.GetDirectoryName(solution.FullName);
-			Debug.Assert(solutionPath != null, "solutionPath != null");
+			
+			if (solutionPath == null) throw new Exception("SolutionPath cannot be null");
 			return Path.Combine(solutionPath, settingsFileName);
+		}
+
+		private string GetSolutionSettingsPath()
+		{
+			return GetSolutionSettingsPath(environment.Solution);
+		}
+
+		private string GetCurrentSettingsPath()
+		{
+			if (environment.Solution.IsOpen) {
+				var path = GetSolutionSettingsPath(environment.Solution);
+
+				if (File.Exists(path)) {
+					return path;
+				}
+			}
+
+			return GetGlobalSettingsPath();
 		}
 
 		#endregion
@@ -71,6 +90,19 @@ namespace Enexure.SolutionSettings.Services
 
 		private void WireUpEvents()
 		{
+			var watcher = null as SettingsFileWatcher;
+			var settingsPath = null as string;
+
+			var switchWatcher = (Action<string>)(newSettingsPath => {
+
+				if (settingsPath != newSettingsPath) {
+					if (watcher != null) {
+						watcher.Dispose();
+					}
+					watcher = new SettingsFileWatcher(newSettingsPath);
+				}
+			});
+
 			var vsReady = VisualStudioReady()
 				.ObserveOn(TaskPoolScheduler.Default);
 				//.Publish()
@@ -86,11 +118,15 @@ namespace Enexure.SolutionSettings.Services
 					/* add the project settings file */
 
 					// Always solution settings
+					settingsPath = GetSolutionSettingsPath();
 
-					var settings = SettingApplier.Extract(environment, applicationRegistryRoot);
-					SettingsPersister.SaveAsync(settingsPath, settings).Wait();
+					if (!File.Exists(settingsPath)) {
+						var settings = SettingApplier.Extract(environment, applicationRegistryRoot);
+						SettingsPersister.SaveAsync(settingsPath, settings).Wait();
 
-					// Recreate watcher
+						// Recreate watcher
+						switchWatcher(settingsPath);
+					}
 				});
 
 			EnvironmentSettingsChanged()
@@ -98,8 +134,10 @@ namespace Enexure.SolutionSettings.Services
 				.ObserveOn(TaskPoolScheduler.Default)
 				.Subscribe(x => {
 					// Current settings
+					watcher.Pause();
 					var settings = SettingApplier.Extract(environment, applicationRegistryRoot);
 					SettingsPersister.SaveAsync(settingsPath, settings).Wait();
+					watcher.Resume();
 				});
 
 			var solutionOpened = SolutionOpened();
@@ -118,19 +156,16 @@ namespace Enexure.SolutionSettings.Services
 					/* reload settings */
 
 					// Current Settings
+					var newSettingsPath = GetCurrentSettingsPath();
 
-					var settings = SettingsPersister.LoadAsync(settingsPath).Result;
+					var settings = SettingsPersister.LoadAsync(newSettingsPath).Result;
 					SettingApplier.Apply(environment, settings);
 
 					// Recreate watcher
+					switchWatcher(newSettingsPath);
 				});
 
 			Debug.WriteLine("Events wired up!");
-		}
-
-		private void Bla()
-		{
-			
 		}
 
 		private IObservable<Unit> SolutionSettingsAdding()

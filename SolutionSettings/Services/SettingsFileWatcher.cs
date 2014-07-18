@@ -26,7 +26,7 @@ namespace Enexure.SolutionSettings.Services
 		void watcher_Changed(object sender, FileSystemEventArgs e)
 		{
 			if (OnSettingsFileChanged != null) {
-				OnSettingsFileChanged(this, b);
+				OnSettingsFileChanged(this, new EventArgs());
 			}
 		}
 		
@@ -34,6 +34,16 @@ namespace Enexure.SolutionSettings.Services
 		{
 			watcher.Changed -= watcher_Changed;
 			watcher.Dispose();
+		}
+
+		public void Pause()
+		{
+			watcher.EnableRaisingEvents = false;
+		}
+
+		public void Resume()
+		{
+			watcher.EnableRaisingEvents = true;
 		}
 	}
 }

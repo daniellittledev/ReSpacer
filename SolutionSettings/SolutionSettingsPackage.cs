@@ -1,21 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.ComponentModel.Design;
-using Enexure.SolutionSettings.Commands;
 using Enexure.SolutionSettings.Services;
-using Enexure.SolutionSettings.Settings;
-using Enexure.SolutionSettings.Settings.Version1;
 using EnvDTE;
-using Microsoft.VisualStudio;
-using Microsoft.Win32;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Shell;
-using Newtonsoft.Json;
 
 namespace Enexure.SolutionSettings
 {

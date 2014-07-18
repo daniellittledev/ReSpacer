@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Reactive;
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using Enexure.SolutionSettings.ReactiveExtensions;
 using EnvDTE;
@@ -70,7 +71,10 @@ namespace Enexure.SolutionSettings.Services
 
 		private void WireUpEvents()
 		{
-			var vsReady = VisualStudioReady();
+			var vsReady = VisualStudioReady()
+				.ObserveOn(TaskPoolScheduler.Default);
+				//.Publish()
+				//.RefCount();
 
 			vsReady
 				.Subscribe(_ => EnsureGlobalSettingsFile().Wait());
@@ -79,20 +83,54 @@ namespace Enexure.SolutionSettings.Services
 
 			solutionSettingsAdding
 				.Subscribe(_ => {
-					/* add the file */
+					/* add the project settings file */
+
+					// Always solution settings
+
+					var settings = SettingApplier.Extract(environment, applicationRegistryRoot);
+					SettingsPersister.SaveAsync(settingsPath, settings).Wait();
+
+					// Recreate watcher
+				});
+
+			EnvironmentSettingsChanged()
+				.Throttle(TimeSpan.FromMilliseconds(300))
+				.ObserveOn(TaskPoolScheduler.Default)
+				.Subscribe(x => {
+					// Current settings
+					var settings = SettingApplier.Extract(environment, applicationRegistryRoot);
+					SettingsPersister.SaveAsync(settingsPath, settings).Wait();
 				});
 
 			var solutionOpened = SolutionOpened();
 			var solutionClosed = SolutionClosed();
-			var settingsNeedsReload = Observable.Merge(solutionOpened, solutionClosed);
+
+			// Ignore closed if there is an opened after it.
+			var openedOrClosedSolution = Observable
+				.Merge(solutionOpened, solutionClosed)
+				.Throttle(TimeSpan.FromSeconds(0.5));
+
+			var settingsNeedsReload = Observable.Merge(vsReady, openedOrClosedSolution);
 
 			settingsNeedsReload
-				.ContinueAfter(() => vsReady)
-				.Throttle(TimeSpan.FromSeconds(0.5))
+				.ObserveOn(TaskPoolScheduler.Default)
 				.Subscribe(_ => {
 					/* reload settings */
+
+					// Current Settings
+
+					var settings = SettingsPersister.LoadAsync(settingsPath).Result;
+					SettingApplier.Apply(environment, settings);
+
+					// Recreate watcher
 				});
 
+			Debug.WriteLine("Events wired up!");
+		}
+
+		private void Bla()
+		{
+			
 		}
 
 		private IObservable<Unit> SolutionSettingsAdding()
@@ -113,32 +151,26 @@ namespace Enexure.SolutionSettings.Services
 
 		private IObservable<Unit> VisualStudioReady()
 		{
-			//var vs = environment.Events.DTEEvents;
-			//return Observable.FromEvent<_dispDTEEvents_OnStartupCompleteEventHandler, Unit>(
-			//	ev => vs.OnStartupComplete += ev,
-			//	ev => vs.OnStartupComplete -= ev);
-		
-			return Observable.Defer(() => Observable.Return(Unit.Default));
+			return Observable.Return(Unit.Default);
 		}
 
 		private IObservable<Unit> SolutionOpened()
 		{
 			var solution = environment.Events.SolutionEvents;
-
 			return Observable.FromEvent<_dispSolutionEvents_OpenedEventHandler, Unit>(
-				ev => solution.Opened += ev,
-				ev => solution.Opened -= ev);
+				c => () => c(Unit.Default),
+				x => solution.Opened += x,
+				x => solution.Opened -= x);
 		}
 
 		private IObservable<Unit> SolutionClosed()
 		{
 			var solution = environment.Events.SolutionEvents;
-
 			return Observable.FromEvent<_dispSolutionEvents_AfterClosingEventHandler, Unit>(
-				ev => solution.AfterClosing += ev,
-				ev => solution.AfterClosing -= ev);
+				c => () => c(Unit.Default), 
+				x => solution.AfterClosing += x,
+				x => solution.AfterClosing -= x);
 		}
 
-		
 	}
 }

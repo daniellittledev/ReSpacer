@@ -17,21 +17,23 @@ namespace Enexure.SolutionSettings.Services
 				NotifyFilter = NotifyFilters.LastWrite,
 			};
 
-			watcher.Changed += (a, b) => {
-				if (OnSettingsFileChanged != null) {
-					OnSettingsFileChanged(this, b);
-				}
-			};
+			watcher.Changed += watcher_Changed;
 
 			// Start
 			watcher.EnableRaisingEvents = true;
 		}
+
+		void watcher_Changed(object sender, FileSystemEventArgs e)
+		{
+			if (OnSettingsFileChanged != null) {
+				OnSettingsFileChanged(this, b);
+			}
+		}
 		
 		public void Dispose()
 		{
-			if (watcher != null) {
-				watcher.Dispose();
-			}
+			watcher.Changed -= watcher_Changed;
+			watcher.Dispose();
 		}
 	}
 }

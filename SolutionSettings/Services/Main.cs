@@ -4,6 +4,7 @@ using System.IO;
 using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
+using Enexure.SolutionSettings.IO;
 using Enexure.SolutionSettings.ReactiveExtensions;
 using EnvDTE;
 using Microsoft.VisualStudio.Shell;
@@ -59,8 +60,8 @@ namespace Enexure.SolutionSettings.Services
 		private readonly RegistryKey applicationRegistryRoot;
 		private readonly string userDataPath;
 
-        private readonly VisualStudioStatusBar visualStudioStatusBar;
-	    private readonly VisualStudioMenuManager visualStudioMenuManager;
+		private readonly VisualStudioStatusBar visualStudioStatusBar;
+		private readonly VisualStudioMenuManager visualStudioMenuManager;
 		private readonly VisualStudioSettingsManager visualStudioSettingsManager;
 
 		//private SettingsFileWatcher settings;
@@ -71,8 +72,8 @@ namespace Enexure.SolutionSettings.Services
 			this.applicationRegistryRoot = applicationRegistryRoot;
 			this.userDataPath = userDataPath;
 
-            this.visualStudioStatusBar = new VisualStudioStatusBar(statusbar);
-		    this.visualStudioMenuManager = new VisualStudioMenuManager(menuCommandService);
+			this.visualStudioStatusBar = new VisualStudioStatusBar(statusbar);
+			this.visualStudioMenuManager = new VisualStudioMenuManager(menuCommandService);
 			this.visualStudioSettingsManager = new VisualStudioSettingsManager(environment);
 		}
 

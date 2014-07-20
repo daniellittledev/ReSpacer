@@ -59,6 +59,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="PackageTest.cs" />
+    <Compile Include="SampleTest.cs" />
     <!---->
     <!---->
     <!---->
@@ -71,6 +72,9 @@
       <Project>{4AEA4A27-7916-4074-9E02-A5096F7EF0D8}</Project>
       <Name>ReSpacer</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Events\" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>

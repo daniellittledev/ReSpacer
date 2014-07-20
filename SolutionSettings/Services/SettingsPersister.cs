@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using Enexure.SolutionSettings.Settings.Version1;
@@ -12,22 +13,28 @@ namespace Enexure.SolutionSettings.Services
 {
 	class SettingsPersister
 	{
+		const string versionPrefix = "Version: ";
+		
 		private static readonly IDictionary<int, Func<StreamReader, Task<VisualStudioSettings>>> versionReader;
+		private static int maxVersion;
 
 		static SettingsPersister()
 		{
 			versionReader = new Dictionary<int, Func<StreamReader, Task<VisualStudioSettings>>>() {
 				{ 2, LoadVersion2Async }
 			};
+
+			maxVersion = versionReader.Keys.Max();
 		}
 
 		public static async Task SaveAsync(string path, VisualStudioSettings settings)
 		{
 			var data = JsonConvert.SerializeObject(settings, Formatting.Indented);
 
-			using (var file = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write))
+			using (var file = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 1024, FileOptions.Asynchronous))
 			using (var writer = new StreamWriter(file)) {
 
+				await writer.WriteLineAsync(versionPrefix + maxVersion);
 				await writer.WriteAsync(data);
 			}
 		}
@@ -35,7 +42,7 @@ namespace Enexure.SolutionSettings.Services
 		public static async Task<VisualStudioSettings> LoadAsync(string path)
 		{
 			try {
-				using (var file = new FileStream(path, FileMode.Open, FileAccess.Read))
+				using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1024, FileOptions.Asynchronous))
 				using (var reader = new StreamReader(file)) {
 
 					var versionNumber = await GetValueAsync(reader);
@@ -55,19 +62,19 @@ namespace Enexure.SolutionSettings.Services
 
 		private static async Task<int> GetValueAsync(StreamReader reader)
 		{
-			const int bufferSize = 4;
-			var buffer = new char[bufferSize];
+			var version = await reader.ReadLineAsync();
 
-			await reader.ReadAsync(buffer, 0, bufferSize);
+			if (version.Length > versionPrefix.Length) {
 
-			var version = new String(buffer);
+				int versionNumber;
+				if (!int.TryParse(version.Substring(versionPrefix.Length), out versionNumber)) {
+					versionNumber = 1;
+				}
 
-			int versionNumber;
-			if (!int.TryParse(version, out versionNumber)) {
-				versionNumber = 1;
+				return versionNumber;
+			} else {
+				return maxVersion;
 			}
-
-			return versionNumber;
 		}
 
 		private static async Task<VisualStudioSettings> LoadVersion1Async(StreamReader reader)

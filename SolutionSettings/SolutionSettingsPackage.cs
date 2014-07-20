@@ -57,7 +57,7 @@ namespace Enexure.SolutionSettings
 			base.Initialize();
 
 			try {
-				main = new Main(GetEnvironment(), ApplicationRegistryRoot, UserDataPath, GetMenuCommandService());
+				main = new Main(GetEnvironment(), ApplicationRegistryRoot, UserDataPath, GetMenuCommandService(), GetStatusBar());
 				main.Run();
 
 			} catch (Exception ex) {
@@ -75,6 +75,11 @@ namespace Enexure.SolutionSettings
 			// Now get the OleCommandService object provided by the MPF; this object is the one 
 			// responsible for handling the collection of commands implemented by the package. 
 			return GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
+		}
+
+		private IVsStatusbar GetStatusBar()
+		{
+			return (IVsStatusbar)GetService(typeof(SVsStatusbar));
 		}
 	}
 }

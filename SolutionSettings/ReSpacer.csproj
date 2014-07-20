@@ -154,6 +154,7 @@
     <Compile Include="Services\SettingsPersister.cs" />
     <Compile Include="Services\VisualStudioHelper.cs" />
     <Compile Include="Services\VisualStudioSettingsManager.cs" />
+    <Compile Include="Services\VisualStudioStatusBar.cs" />
     <Compile Include="Settings\IndentStyle.cs" />
     <Compile Include="Settings\Version1\ItemSetting.cs" />
     <Compile Include="Settings\Version1\TabSettings.cs" />

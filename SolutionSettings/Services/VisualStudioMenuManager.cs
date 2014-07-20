@@ -19,6 +19,8 @@ namespace Enexure.SolutionSettings.Services
 		public VisualStudioMenuManager(OleMenuCommandService menuCommandService)
 		{
 			this.menuCommandService = menuCommandService;
+
+			SetupUserInterface();
 		}
 
 		public event EventHandler OnOpenGlobalSettings;

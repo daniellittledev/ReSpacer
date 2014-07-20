@@ -7,38 +7,58 @@ namespace Enexure.SolutionSettings.Services
 	{
 		private readonly FileSystemWatcher watcher;
 		
-		public event EventHandler OnSettingsFileChanged; 
+		public event EventHandler<string> OnSettingsFileChanged;
+		public event EventHandler<string> OnSettingsFileDeleted;
 
-		public SettingsFileWatcher(string settingsPath)
+		public SettingsFileWatcher(string fileName)
 		{
 			watcher = new FileSystemWatcher {
-				Path = Path.GetDirectoryName(settingsPath),
-				Filter = Path.GetFileName(settingsPath),
-				NotifyFilter = NotifyFilters.LastWrite,
+				Filter = fileName,
+				NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
 			};
 
-			watcher.Changed += watcher_Changed;
-
-			// Start
-			watcher.EnableRaisingEvents = true;
+			watcher.Renamed += WatcherOnRenamed;
+			watcher.Changed += WatcherOnChanged;
+			watcher.Deleted += WatcherOnDeleted;
 		}
 
-		void watcher_Changed(object sender, FileSystemEventArgs e)
+		private void WatcherOnRenamed(object sender, RenamedEventArgs renamedEventArgs)
+		{
+			if (OnSettingsFileDeleted != null) {
+				OnSettingsFileDeleted(this, renamedEventArgs.OldFullPath);
+			}
+		}
+
+		private void WatcherOnDeleted(object sender, FileSystemEventArgs fileSystemEventArgs)
+		{
+			if (OnSettingsFileDeleted != null) {
+				OnSettingsFileDeleted(this, fileSystemEventArgs.FullPath);
+			}
+		}
+
+		void WatcherOnChanged(object sender, FileSystemEventArgs e)
 		{
 			if (OnSettingsFileChanged != null) {
-				OnSettingsFileChanged(this, new EventArgs());
+				OnSettingsFileChanged(this, e.FullPath);
 			}
 		}
 		
 		public void Dispose()
 		{
-			watcher.Changed -= watcher_Changed;
+			watcher.Deleted -= WatcherOnDeleted;
+			watcher.Changed -= WatcherOnChanged;
 			watcher.Dispose();
 		}
 
 		public void Pause()
 		{
 			watcher.EnableRaisingEvents = false;
+		}
+
+		public void SwitchTo(string settingsPath)
+		{
+			watcher.Path = settingsPath;
+			watcher.EnableRaisingEvents = true;
 		}
 
 		public void Resume()

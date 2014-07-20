@@ -7,6 +7,7 @@ using System.Reactive.Linq;
 using Enexure.SolutionSettings.ReactiveExtensions;
 using EnvDTE;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.Win32;
 using Task = System.Threading.Tasks.Task;
 
@@ -56,116 +57,135 @@ namespace Enexure.SolutionSettings.Services
 
 		private readonly DTE environment;
 		private readonly RegistryKey applicationRegistryRoot;
-		private readonly string userDataPath; 
+		private readonly string userDataPath;
 
-		private readonly VisualStudioMenuManager visualStudioMenuManager;
+        private readonly VisualStudioStatusBar visualStudioStatusBar;
+	    private readonly VisualStudioMenuManager visualStudioMenuManager;
 		private readonly VisualStudioSettingsManager visualStudioSettingsManager;
 
 		//private SettingsFileWatcher settings;
 
-		public Main(DTE environment, RegistryKey applicationRegistryRoot, string userDataPath, OleMenuCommandService menuCommandService)
+		public Main(DTE environment, RegistryKey applicationRegistryRoot, string userDataPath, OleMenuCommandService menuCommandService, IVsStatusbar statusbar)
 		{
 			this.environment = environment;
 			this.applicationRegistryRoot = applicationRegistryRoot;
 			this.userDataPath = userDataPath;
 
-			this.visualStudioMenuManager = new VisualStudioMenuManager(menuCommandService);
+            this.visualStudioStatusBar = new VisualStudioStatusBar(statusbar);
+		    this.visualStudioMenuManager = new VisualStudioMenuManager(menuCommandService);
 			this.visualStudioSettingsManager = new VisualStudioSettingsManager(environment);
 		}
 
-		public async void Run()
+		public void Run()
 		{
 			WireUpEvents();
 		}
 
-		private async Task EnsureGlobalSettingsFile()
-		{
-			/* ensure global settings */
-			var settingsPath = GetGlobalSettingsPath();
-			if (!File.Exists(settingsPath)) {
-				var settings = SettingApplier.Extract(environment, applicationRegistryRoot);
-				await SettingsPersister.SaveAsync(settingsPath, settings);
-			}
-		}
-
 		private void WireUpEvents()
 		{
-			var watcher = null as SettingsFileWatcher;
+			var watcher = new SettingsFileWatcher(settingsFileName);
+
+			var vsReady = VisualStudioReady();
+			var solutionSettingsAdding = SolutionSettingsAdding();
+			var solutionOpened = SolutionOpened();
+			var solutionClosed = SolutionClosed();
+			var environmentSettingsChanged = EnvironmentSettingsChanged();
+			var fileSettingsChanged = SettingsFileChanged(watcher);
+			var fileSettingsDeleted = SettingsFileDeleted(watcher);
+
 			var settingsPath = null as string;
 
 			var switchWatcher = (Action<string>)(newSettingsPath => {
 
 				if (settingsPath != newSettingsPath) {
-					if (watcher != null) {
-						watcher.Dispose();
-					}
-					watcher = new SettingsFileWatcher(newSettingsPath);
+
+					var globalSettings = GetGlobalSettingsPath();
+					visualStudioStatusBar.UpdateStatus(newSettingsPath == globalSettings ? "Loaded global ReSpacer settings" : "Loaded solution ReSpacer settings");
+
+					watcher.SwitchTo(Path.GetDirectoryName(newSettingsPath));
+					settingsPath = newSettingsPath;
 				}
 			});
 
-			var vsReady = VisualStudioReady()
-				.ObserveOn(TaskPoolScheduler.Default);
-				//.Publish()
-				//.RefCount();
-
 			vsReady
-				.Subscribe(_ => EnsureGlobalSettingsFile().Wait());
-
-			var solutionSettingsAdding = SolutionSettingsAdding();
+				.Where(path => !File.Exists(path))
+				.Select(path => new { Path = path, Settings = SettingApplier.Extract(environment, applicationRegistryRoot) })
+				.SelectMany(async x => {
+					await SettingsPersister.SaveAsync(x.Path, x.Settings);
+					return Unit.Default;
+				})
+				.Subscribe();
 
 			solutionSettingsAdding
-				.Subscribe(_ => {
-					/* add the project settings file */
-
-					// Always solution settings
-					settingsPath = GetSolutionSettingsPath();
-
-					if (!File.Exists(settingsPath)) {
-						var settings = SettingApplier.Extract(environment, applicationRegistryRoot);
-						SettingsPersister.SaveAsync(settingsPath, settings).Wait();
-
-						// Recreate watcher
-						switchWatcher(settingsPath);
-					}
-				});
-
-			EnvironmentSettingsChanged()
-				.Throttle(TimeSpan.FromMilliseconds(300))
-				.ObserveOn(TaskPoolScheduler.Default)
-				.Subscribe(x => {
-					// Current settings
-					watcher.Pause();
+				.Select(_ => GetSolutionSettingsPath())
+				.Where(path => !File.Exists(path))
+				.SelectMany(async path => {
+					
 					var settings = SettingApplier.Extract(environment, applicationRegistryRoot);
-					SettingsPersister.SaveAsync(settingsPath, settings).Wait();
-					watcher.Resume();
+					await SettingsPersister.SaveAsync(path, settings);
+
+					return path;
+				})
+				.Subscribe(path => {
+					switchWatcher(path);
+
+					VisualStudioHelper.AddFileToSolution(environment, path);
+					VisualStudioHelper.OpenFile(environment, path);
 				});
 
-			var solutionOpened = SolutionOpened();
-			var solutionClosed = SolutionClosed();
+			environmentSettingsChanged
+				.Throttle(TimeSpan.FromMilliseconds(300))
+				.Select(_ => SettingApplier.Extract(environment, applicationRegistryRoot))
+				.SelectMany(async settings => {
+					watcher.Pause();
+					await SettingsPersister.SaveAsync(settingsPath, settings);
+					watcher.Resume();
+					return Unit.Default;
+				})
+				.Subscribe(_ => visualStudioStatusBar.UpdateStatus("Settings saved"));
+
 
 			// Ignore closed if there is an opened after it.
 			var openedOrClosedSolution = Observable
 				.Merge(solutionOpened, solutionClosed)
+				.Throttle(TimeSpan.FromSeconds(0.5))
+				.Where(newSettingsPath => settingsPath != newSettingsPath);
+
+			fileSettingsChanged = fileSettingsChanged
 				.Throttle(TimeSpan.FromSeconds(0.5));
 
-			var settingsNeedsReload = Observable.Merge(vsReady, openedOrClosedSolution);
+			fileSettingsDeleted = fileSettingsDeleted
+				.Throttle(TimeSpan.FromSeconds(0.5))
+				.Select(_ => GetCurrentSettingsPath());
 
-			settingsNeedsReload
-				.ObserveOn(TaskPoolScheduler.Default)
-				.Subscribe(_ => {
-					/* reload settings */
-
-					// Current Settings
-					var newSettingsPath = GetCurrentSettingsPath();
-
-					var settings = SettingsPersister.LoadAsync(newSettingsPath).Result;
-					SettingApplier.Apply(environment, settings);
-
-					// Recreate watcher
-					switchWatcher(newSettingsPath);
+			Observable
+				.Merge(vsReady, openedOrClosedSolution, fileSettingsChanged, fileSettingsDeleted)
+				.TakeUntil(VisualStudioShutdown())
+				.SelectMany(async newSettingsPath => new { Path = newSettingsPath, Settings = await SettingsPersister.LoadAsync(newSettingsPath) })
+				.Subscribe(x => {
+					SettingApplier.Apply(environment, x.Settings);
+					switchWatcher(x.Path);
 				});
 
 			Debug.WriteLine("Events wired up!");
+		}
+
+		#region Events
+
+		private IObservable<string> SettingsFileChanged(SettingsFileWatcher watcher)
+		{
+			return Observable.FromEventPattern<string>(
+				ev => watcher.OnSettingsFileChanged += ev,
+				ev => watcher.OnSettingsFileChanged -= ev)
+				.Select(x => x.EventArgs);
+		}
+
+		private IObservable<string> SettingsFileDeleted(SettingsFileWatcher watcher)
+		{
+			return Observable.FromEventPattern<string>(
+				ev => watcher.OnSettingsFileDeleted += ev,
+				ev => watcher.OnSettingsFileDeleted -= ev)
+				.Select(x => x.EventArgs);
 		}
 
 		private IObservable<Unit> SolutionSettingsAdding()
@@ -184,28 +204,42 @@ namespace Enexure.SolutionSettings.Services
 				.Select(x => Unit.Default);
 		}
 
-		private IObservable<Unit> VisualStudioReady()
+		private IObservable<string> VisualStudioReady()
 		{
-			return Observable.Return(Unit.Default);
+			return Observable.Return(GetGlobalSettingsPath());
 		}
 
-		private IObservable<Unit> SolutionOpened()
+		private IObservable<string> SolutionOpened()
 		{
 			var solution = environment.Events.SolutionEvents;
-			return Observable.FromEvent<_dispSolutionEvents_OpenedEventHandler, Unit>(
+			return Observable
+                .FromEvent<_dispSolutionEvents_OpenedEventHandler, Unit>(
+				    c => () => c(Unit.Default),
+				    x => solution.Opened += x,
+				    x => solution.Opened -= x)
+                .Select(_ => GetCurrentSettingsPath());
+		}
+
+        private IObservable<string> SolutionClosed()
+		{
+			var solution = environment.Events.SolutionEvents;
+			return Observable
+                .FromEvent<_dispSolutionEvents_AfterClosingEventHandler, Unit>(
+				    c => () => c(Unit.Default), 
+				    x => solution.AfterClosing += x,
+				    x => solution.AfterClosing -= x)
+                .Select(_ => GetGlobalSettingsPath());
+		}
+
+		private IObservable<Unit> VisualStudioShutdown()
+		{
+			var dte = environment.Events.DTEEvents;
+			return Observable.FromEvent<_dispDTEEvents_OnBeginShutdownEventHandler, Unit>(
 				c => () => c(Unit.Default),
-				x => solution.Opened += x,
-				x => solution.Opened -= x);
+				x => dte.OnBeginShutdown += x,
+				x => dte.OnBeginShutdown -= x);
 		}
 
-		private IObservable<Unit> SolutionClosed()
-		{
-			var solution = environment.Events.SolutionEvents;
-			return Observable.FromEvent<_dispSolutionEvents_AfterClosingEventHandler, Unit>(
-				c => () => c(Unit.Default), 
-				x => solution.AfterClosing += x,
-				x => solution.AfterClosing -= x);
-		}
-
+		#endregion
 	}
 }

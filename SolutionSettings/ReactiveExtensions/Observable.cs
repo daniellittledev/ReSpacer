@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Serilog;
+using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
@@ -22,6 +24,27 @@ namespace Enexure.SolutionSettings.ReactiveExtensions
 		  this IObservable<T> observable, Func<IObservable<TRet>> selector)
 		{
 			return observable.AsCompletion().SelectMany(_ => selector());
+		}
+	}
+
+	public static class ObservableTrace
+	{
+		public static IObservable<TSource> Trace<TSource>(this IObservable<TSource> source, string name)
+		{
+			var id = 0;
+			return Observable.Create<TSource>(observer => {
+				
+				var itemId = ++id;
+				Action<string, object> trace = (m, v) => Log.Information("{name}{id}: {method}({value})", name, itemId, m, v);
+
+				trace("Subscribe", null);
+				IDisposable disposable = source.Subscribe(
+					v => { trace("OnNext", v); observer.OnNext(v); },
+					e => { trace("OnError", e); observer.OnError(e); },
+					() => { trace("OnCompleted", null); observer.OnCompleted(); });
+
+				return () => { trace("Dispose", null); disposable.Dispose(); };
+			});
 		}
 	}
 }

@@ -64,17 +64,13 @@ namespace Enexure.SolutionSettings.Services
 		{
 			var version = await reader.ReadLineAsync();
 
-			if (version.Length > versionPrefix.Length) {
-
-				int versionNumber;
-				if (!int.TryParse(version.Substring(versionPrefix.Length), out versionNumber)) {
-					versionNumber = 1;
-				}
-
-				return versionNumber;
-			} else {
-				return maxVersion;
+			int versionNumber;
+			if (version.Length < (versionPrefix.Length + 1)
+				|| !int.TryParse(version.Substring(versionPrefix.Length), out versionNumber)) {
+				versionNumber = 1;
 			}
+
+			return versionNumber;
 		}
 
 		private static async Task<VisualStudioSettings> LoadVersion1Async(StreamReader reader)

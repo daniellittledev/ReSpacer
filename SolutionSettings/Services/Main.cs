@@ -10,6 +10,8 @@ using EnvDTE;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.Win32;
+using Seq;
+using Serilog;
 using Task = System.Threading.Tasks.Task;
 
 namespace Enexure.SolutionSettings.Services
@@ -80,6 +82,11 @@ namespace Enexure.SolutionSettings.Services
 		public void Run()
 		{
 			WireUpEvents();
+
+			//Log.Logger = new LoggerConfiguration()
+			//	.WriteTo.Seq("http://localhost:5341")
+			//	.CreateLogger();
+
 		}
 
 		private void WireUpEvents()
@@ -111,10 +118,12 @@ namespace Enexure.SolutionSettings.Services
 			vsReady
 				.Where(path => !File.Exists(path))
 				.Select(path => new { Path = path, Settings = SettingApplier.Extract(environment, applicationRegistryRoot) })
+				//.Trace("vsReady - Select")
 				.SelectMany(async x => {
 					await SettingsPersister.SaveAsync(x.Path, x.Settings);
 					return Unit.Default;
 				})
+				//.Trace("vsReady - SelectMany")
 				.Subscribe();
 
 			solutionSettingsAdding
@@ -162,7 +171,9 @@ namespace Enexure.SolutionSettings.Services
 			Observable
 				.Merge(vsReady, openedOrClosedSolution, fileSettingsChanged, fileSettingsDeleted)
 				.TakeUntil(VisualStudioShutdown())
+				//.Trace("reload - TakeUntil")
 				.SelectMany(async newSettingsPath => new { Path = newSettingsPath, Settings = await SettingsPersister.LoadAsync(newSettingsPath) })
+				//.Trace("reload - SelectMany")
 				.Subscribe(x => {
 					SettingApplier.Apply(environment, x.Settings);
 					switchWatcher(x.Path);

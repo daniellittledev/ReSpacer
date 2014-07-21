@@ -31,6 +31,7 @@ namespace Enexure.SolutionSettings.ReactiveExtensions
 	{
 		public static IObservable<TSource> Trace<TSource>(this IObservable<TSource> source, string name)
 		{
+#if DEBUG
 			var id = 0;
 			return Observable.Create<TSource>(observer => {
 				
@@ -45,6 +46,10 @@ namespace Enexure.SolutionSettings.ReactiveExtensions
 
 				return () => { trace("Dispose", null); disposable.Dispose(); };
 			});
+#else
+			return source;
+#endif
+
 		}
 	}
 }

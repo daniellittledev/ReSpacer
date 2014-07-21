@@ -1,14 +1,16 @@
 ﻿using System;
 using System.IO;
+using System.Reactive.Linq;
 
 namespace Enexure.SolutionSettings.Services
 {
 	class SettingsFileWatcher : IDisposable
 	{
 		private readonly FileSystemWatcher watcher;
-		
-		public event EventHandler<string> OnSettingsFileChanged;
-		public event EventHandler<string> OnSettingsFileDeleted;
+
+		public IObservable<FileSystemEventArgs> OnSettingsFileCreated;
+		public IObservable<FileSystemEventArgs> OnSettingsFileChanged;
+		public IObservable<FileSystemEventArgs> OnSettingsFileDeleted;
 
 		public SettingsFileWatcher(string fileName)
 		{
@@ -17,36 +19,30 @@ namespace Enexure.SolutionSettings.Services
 				NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
 			};
 
-			watcher.Renamed += WatcherOnRenamed;
-			watcher.Changed += WatcherOnChanged;
-			watcher.Deleted += WatcherOnDeleted;
+			OnSettingsFileCreated = Observable.FromEvent<FileSystemEventHandler, FileSystemEventArgs>(
+				c => (a, b) => c(b),
+				x => watcher.Created += x,
+				x => watcher.Created -= x);
+
+			OnSettingsFileChanged = Observable.FromEvent<FileSystemEventHandler, FileSystemEventArgs>(
+				c => (a, b) => c(b),
+				x => watcher.Changed += x,
+				x => watcher.Changed -= x);
+
+			OnSettingsFileDeleted = Observable.Merge(
+				Observable.FromEvent<FileSystemEventHandler, FileSystemEventArgs>(
+					c => (a, b) => c(b),
+					x => watcher.Deleted += x,
+					x => watcher.Deleted -= x),
+				Observable.FromEvent<RenamedEventHandler, RenamedEventArgs>(
+					c => (a, b) => c(b),
+					x => watcher.Renamed += x,
+					x => watcher.Renamed -= x)
+					.Select(x => new FileSystemEventArgs(WatcherChangeTypes.Deleted, x.OldFullPath, x.Name)));
 		}
 
-		private void WatcherOnRenamed(object sender, RenamedEventArgs renamedEventArgs)
-		{
-			if (OnSettingsFileDeleted != null) {
-				OnSettingsFileDeleted(this, renamedEventArgs.OldFullPath);
-			}
-		}
-
-		private void WatcherOnDeleted(object sender, FileSystemEventArgs fileSystemEventArgs)
-		{
-			if (OnSettingsFileDeleted != null) {
-				OnSettingsFileDeleted(this, fileSystemEventArgs.FullPath);
-			}
-		}
-
-		void WatcherOnChanged(object sender, FileSystemEventArgs e)
-		{
-			if (OnSettingsFileChanged != null) {
-				OnSettingsFileChanged(this, e.FullPath);
-			}
-		}
-		
 		public void Dispose()
 		{
-			watcher.Deleted -= WatcherOnDeleted;
-			watcher.Changed -= WatcherOnChanged;
 			watcher.Dispose();
 		}
 
@@ -57,7 +53,7 @@ namespace Enexure.SolutionSettings.Services
 
 		public void SwitchTo(string settingsPath)
 		{
-			watcher.Path = settingsPath;
+			watcher.Path = Path.GetDirectoryName(settingsPath);
 			watcher.EnableRaisingEvents = true;
 		}
 

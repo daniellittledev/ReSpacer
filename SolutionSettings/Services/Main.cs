@@ -66,19 +66,21 @@ namespace Enexure.SolutionSettings.Services
 		private readonly DTE environment;
 		private readonly RegistryKey applicationRegistryRoot;
 		private readonly string userDataPath;
+	    private readonly IVsOutputWindowPane outputWindowPane;
 
-		private readonly VisualStudioStatusBar visualStudioStatusBar;
+	    private readonly VisualStudioStatusBar visualStudioStatusBar;
 		private readonly VisualStudioMenuManager visualStudioMenuManager;
 		private readonly VisualStudioSettingsManager visualStudioSettingsManager;
 
 		private SettingsOption activeSetting;
 		private string currentSettingsPath;
 
-		public Main(DTE environment, RegistryKey applicationRegistryRoot, string userDataPath, OleMenuCommandService menuCommandService, IVsStatusbar statusbar)
+		public Main(DTE environment, RegistryKey applicationRegistryRoot, string userDataPath, OleMenuCommandService menuCommandService, IVsStatusbar statusbar, IVsOutputWindowPane outputWindowPane)
 		{
 			this.environment = environment;
 			this.applicationRegistryRoot = applicationRegistryRoot;
 			this.userDataPath = userDataPath;
+			this.outputWindowPane = outputWindowPane;
 
 			this.visualStudioStatusBar = new VisualStudioStatusBar(statusbar);
 			this.visualStudioMenuManager = new VisualStudioMenuManager(menuCommandService);
@@ -137,14 +139,13 @@ namespace Enexure.SolutionSettings.Services
 
 			vsReady
 				.Where(path => !File.Exists(path))
-				.Trace("vsReady - Select")
 				.SelectMany(async path => {
 					var settings = SettingApplier.Extract(environment, applicationRegistryRoot);
 					await SettingsPersister.SaveAsync(path, settings);
-					return path;
+					return Unit.Default;
 				})
-				.Trace("vsReady - SelectMany")
-				.Subscribe(switchActiveSettings);
+				.Trace("Visual studio startup", "New global settings file created")
+				.Subscribe();
 
 			solutionSettingsAdding
 				.Select(_ => GetSolutionSettingsPath())
@@ -156,7 +157,7 @@ namespace Enexure.SolutionSettings.Services
 
 					return path;
 				})
-				.Trace("solutionSettingsAdding - SelectMany")
+				.Trace("Add Settings File", "New solution settings file created")
 				.Subscribe(path => {
 					switchActiveSettings(path);
 
@@ -168,12 +169,14 @@ namespace Enexure.SolutionSettings.Services
 				.Throttle(TimeSpan.FromMilliseconds(300))
 				.Select(_ => SettingApplier.Extract(environment, applicationRegistryRoot))
 				.SelectMany(async settings => {
+					
 					activeWatcher().Pause();
 					await SettingsPersister.SaveAsync(currentSettingsPath, settings);
 					activeWatcher().Resume();
-					return Unit.Default;
+
+					return currentSettingsPath;
 				})
-				.Trace("environmentSettingsChanged - SelectMany")
+				.Trace("Environment settings changed", "New settings saved")
 				.Subscribe(_ => visualStudioStatusBar.UpdateStatus("Settings saved"));
 
 
@@ -204,15 +207,17 @@ namespace Enexure.SolutionSettings.Services
 			Observable
 				.Merge(vsReady, openedOrClosedSolution, solutionSettingsChanged, solutionSettingsDeleted, globalSettingsChanged)
 				.TakeUntil(VisualStudioShutdown())
-				.Trace("reload - TakeUntil")
+				.Trace("Settings needs reload", "Before loading settings file")
 				.SelectMany(async newSettingsPath => new {
 					Path = newSettingsPath, 
 					Settings = await SettingsPersister.LoadAsync(newSettingsPath)
 				})
-				.Trace("reload - SelectMany")
+				.Trace("Settings needs reload", "After loading settings file")
 				.Subscribe(x => {
 					SettingApplier.Apply(environment, x.Settings);
 					switchActiveSettings(x.Path);
+
+					//VisualStudioHelper.WriteTo(outputWindowPane, "Loaded settings from " + x.Path);
 				});
 
 			Debug.WriteLine("Events wired up!");

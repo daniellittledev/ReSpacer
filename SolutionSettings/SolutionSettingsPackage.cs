@@ -57,7 +57,11 @@ namespace Enexure.SolutionSettings
 			base.Initialize();
 
 			try {
-				main = new Main(GetEnvironment(), ApplicationRegistryRoot, UserDataPath, GetMenuCommandService(), GetStatusBar());
+				main = new Main(GetEnvironment(), ApplicationRegistryRoot, UserDataPath, 
+                    GetMenuCommandService(), 
+                    GetStatusBar(),
+                    GetOutputWindow());
+
 				main.Run();
 
 			} catch (Exception ex) {
@@ -81,5 +85,10 @@ namespace Enexure.SolutionSettings
 		{
 			return (IVsStatusbar)GetService(typeof(SVsStatusbar));
 		}
+
+        private IVsOutputWindowPane GetOutputWindow()
+        {
+            return (IVsOutputWindowPane)GetService(typeof(SVsGeneralOutputWindowPane));
+        }
 	}
 }

@@ -1,5 +1,7 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using EnvDTE;
+using Microsoft.VisualStudio.Shell.Interop;
 
 namespace Enexure.SolutionSettings.Services
 {
@@ -21,5 +23,14 @@ namespace Enexure.SolutionSettings.Services
 		{
 			environment.ItemOperations.OpenFile(filePath);
 		}
+
+        public static void WriteTo(IVsOutputWindowPane windowPane, string text)
+        {
+            if (windowPane == null) throw new ArgumentNullException("windowPane");
+
+            if (Microsoft.VisualStudio.ErrorHandler.Failed(windowPane.OutputString(text))) {
+                Debug.WriteLine("Failed to write on the Output window");
+            }
+        }
 	}
 }

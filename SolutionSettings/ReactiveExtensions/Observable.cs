@@ -29,14 +29,14 @@ namespace Enexure.SolutionSettings.ReactiveExtensions
 
 	public static class ObservableTrace
 	{
-		public static IObservable<TSource> Trace<TSource>(this IObservable<TSource> source, string name)
+		public static IObservable<TSource> Trace<TSource>(this IObservable<TSource> source, string @event, string name)
 		{
 #if DEBUG
 			var id = 0;
 			return Observable.Create<TSource>(observer => {
 				
 				var itemId = ++id;
-				Action<string, object> trace = (m, v) => Log.Information("{name}{id}: {method}({value})", name, itemId, m, v);
+				Action<string, object> trace = (m, v) => Log.Information("{event}: {name} ({id}): {method}" + ((v != null) ? "({value})" : ""), @event, name, itemId, m, v);
 
 				trace("Subscribe", null);
 				IDisposable disposable = source.Subscribe(

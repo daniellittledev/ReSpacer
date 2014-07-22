@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Enexure.SolutionSettings.Settings
+﻿namespace Enexure.SolutionSettings.Settings.Version1
 {
     public class ItemSetting
     {

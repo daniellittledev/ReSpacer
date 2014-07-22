@@ -1,5 +1,4 @@
-#Solution Settings
-
+#ReSpacer
 This is a Visual Studio 2013 plugin that will allow per solution tab settings configuration.
 
 

@@ -58,6 +58,7 @@
     <!---->
     <!---->
     <!---->
+    <Compile Include="Misc\FileTests.cs" />
     <Compile Include="PackageTest.cs" />
     <Compile Include="IntegrationTest Library\DialogboxPurger.cs" />
     <Compile Include="IntegrationTest Library\NativeMethods.cs" />
@@ -71,9 +72,9 @@
     <None Include="Key.snk" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SolutionSettings.csproj">
+    <ProjectReference Include="..\ReSpacer.csproj">
       <Project>{4AEA4A27-7916-4074-9E02-A5096F7EF0D8}</Project>
-      <Name>SolutionSettings</Name>
+      <Name>ReSpacer</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
@@ -89,11 +90,14 @@ namespace Enexure.SolutionSettings.Services
 
 		public void Run()
 		{
-#if DEBUG
+			var logPath = Path.Combine(userDataPath, @"ReSpacer\Logs\", "log-{Date}.txt");
+
 			Log.Logger = new LoggerConfiguration()
+#if DEBUG
 				.WriteTo.Seq("http://localhost:5341")
-				.CreateLogger();
 #endif
+				.WriteTo.RollingFile(logPath)
+				.CreateLogger();
 
 			WireUpEvents();
 
@@ -166,6 +170,7 @@ namespace Enexure.SolutionSettings.Services
 				});
 
 			environmentSettingsChanged
+				.Trace("Environment settings changed", "Before save")
 				.Throttle(TimeSpan.FromMilliseconds(300))
 				.Select(_ => SettingApplier.Extract(environment, applicationRegistryRoot))
 				.SelectMany(async settings => {
@@ -179,10 +184,10 @@ namespace Enexure.SolutionSettings.Services
 				.Trace("Environment settings changed", "New settings saved")
 				.Subscribe(_ => visualStudioStatusBar.UpdateStatus("Settings saved"));
 
-
 			// Ignore closed if there is an opened after it.
 			var openedOrClosedSolution = Observable
 				.Merge(solutionOpened, solutionClosed)
+				.Trace("Opened or closed solution", "Before conditions")
 				.Throttle(TimeSpan.FromSeconds(0.5))
 				.Where(newSettingsPath => currentSettingsPath != newSettingsPath);
 
@@ -206,6 +211,7 @@ namespace Enexure.SolutionSettings.Services
 
 			Observable
 				.Merge(vsReady, openedOrClosedSolution, solutionSettingsChanged, solutionSettingsDeleted, globalSettingsChanged)
+				.Trace("Settings needs reload", "Before take until")
 				.TakeUntil(VisualStudioShutdown())
 				.Trace("Settings needs reload", "Before loading settings file")
 				.SelectMany(async newSettingsPath => new {
@@ -217,7 +223,8 @@ namespace Enexure.SolutionSettings.Services
 					SettingApplier.Apply(environment, x.Settings);
 					switchActiveSettings(x.Path);
 
-					//VisualStudioHelper.WriteTo(outputWindowPane, "Loaded settings from " + x.Path);
+					var name = "CSharp".ToLowerInvariant();
+					Log.Information("CSharp InsertTabs is {Value}", x.Settings.Single(y => y.Name.ToLowerInvariant() == name).Settings.TabSettings.InsertTabs);
 				});
 
 			Debug.WriteLine("Events wired up!");

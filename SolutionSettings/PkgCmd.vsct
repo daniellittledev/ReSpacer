@@ -13,7 +13,7 @@
 			<Group guid="guidSolutionSettingsCmdSet" id="SettingsGroup" priority="0x0600">
 				<Parent guid="guidSHLMainMenu" id="IDM_VS_CSCD_SOLUTION_ADD"/>
 			</Group>
-            <!--<Group guid="guidSolutionSettingsCmdSet" id="ToolsMenuGroup" priority="0x600">
+			<!--<Group guid="guidSolutionSettingsCmdSet" id="ToolsMenuGroup" priority="0x600">
 				<Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
 			</Group>-->
 		</Groups>

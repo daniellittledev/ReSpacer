@@ -5,6 +5,7 @@ using Enexure.SolutionSettings.Settings;
 using Enexure.SolutionSettings.Settings.Version2;
 using EnvDTE;
 using Microsoft.Win32;
+using Serilog;
 
 namespace Enexure.SolutionSettings.Services
 {
@@ -19,7 +20,16 @@ namespace Enexure.SolutionSettings.Services
 
 		private static void ApplyProperties(DTE environment, string languageName, TextEditorSettings textEditorSettings)
 		{
-			var properties = environment.Properties["TextEditor", languageName];
+			Properties properties;
+			var category = "TextEditor";
+
+			try {
+				properties = environment.Properties[category, languageName];
+			} catch (InvalidCastException ex) {
+
+				Log.Warning(ex, "ApplyProperties: Could not load properties in {category} for {page}", category, languageName);
+				return;
+			}
 
 			var tabSettings = textEditorSettings.TabSettings;
 			ApplyProperty(properties, "IndentStyle", tabSettings.IndentStyle);
@@ -46,6 +56,7 @@ namespace Enexure.SolutionSettings.Services
 		private static IEnumerable<SettingsPropertyCollection> ExtractSettings(DTE environment, RegistryKey applicationRegistryRoot)
 		{
 			return GetPropertyPages(applicationRegistryRoot)
+				.Where(x => !string.IsNullOrWhiteSpace(x))
 				.Select(pageName => new SettingsPropertyCollection() {
 					Name = pageName,
 					Settings = ExtractProperties(environment, pageName)
@@ -56,7 +67,16 @@ namespace Enexure.SolutionSettings.Services
 
 		private static TextEditorSettings ExtractProperties(DTE environment, string languageName)
 		{
-			var properties = environment.Properties["TextEditor", languageName];
+			Properties properties;
+			var category = "TextEditor";
+
+			try {
+				properties = environment.Properties[category, languageName];
+			} catch (InvalidCastException ex) {
+
+				Log.Warning(ex, "ExtractProperties: Could not load properties in {category} for {page}", category, languageName);
+				return null;
+			}
 
 			if (!HasProperty(properties, "IndentStyle")) {
 				return null;

@@ -31,14 +31,13 @@ namespace Enexure.SolutionSettings.ReactiveExtensions
 	{
 		public static IObservable<TSource> Trace<TSource>(this IObservable<TSource> source, string @event, string name)
 		{
-#if DEBUG
 			var id = 0;
 			return Observable.Create<TSource>(observer => {
 				
 				var itemId = ++id;
 				Action<string, object> trace = (m, v) => Log.Information("{event}: {name} ({id}): {method}" + ((v != null) ? "({value})" : ""), @event, name, itemId, m, v);
 
-				trace("Subscribe", null);
+				trace("Subscribed", null);
 				IDisposable disposable = source.Subscribe(
 					v => { trace("OnNext", v); observer.OnNext(v); },
 					e => { trace("OnError", e); observer.OnError(e); },
@@ -46,9 +45,6 @@ namespace Enexure.SolutionSettings.ReactiveExtensions
 
 				return () => { trace("Dispose", null); disposable.Dispose(); };
 			});
-#else
-			return source;
-#endif
 
 		}
 	}
